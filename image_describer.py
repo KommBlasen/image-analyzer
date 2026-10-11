@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import io
-import mimetypes
 import os
 import sys
 from pathlib import Path
@@ -11,45 +10,27 @@ from openai import OpenAI
 from PIL import Image, UnidentifiedImageError
 
 MAX_BYTES = 20 * 1024 * 1024
-SUPPORTED_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp",
-    ".bmp",
-    ".gif",
-    ".tif",
-    ".tiff",
-    ".heic",
-    ".heif",
-}
 
 
-def encode_image_to_data_url(path: str | os.PathLike[str]) -> str:
+def to_png_data_url(path: str | os.PathLike[str]) -> str:
     file_path = Path(path)
-    ext = file_path.suffix.lower()
+    if not file_path.exists():
+        raise FileNotFoundError(f"Datei nicht gefunden: {file_path}")
 
-    if ext in {".jpg", ".jpeg", ".png", ".webp"}:
-        mime_type = mimetypes.guess_type(str(file_path))[0] or "image/jpeg"
-        data = file_path.read_bytes()
-    else:
-        try:
-            with Image.open(file_path) as img:
-                img = img.convert("RGB")
-                buffer = io.BytesIO()
-                img.save(buffer, format="PNG")
-                data = buffer.getvalue()
-                mime_type = "image/png"
-        except (UnidentifiedImageError, OSError, ValueError) as exc:
-            raise ValueError(
-                "Bild konnte nicht gelesen werden. Bitte ein gültiges Bildformat nutzen."
-            ) from exc
+    try:
+        with Image.open(file_path) as img:
+            img = img.convert("RGB")
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            data = buffer.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise ValueError(f"Bild konnte nicht gelesen werden: {file_path}") from exc
 
     if len(data) > MAX_BYTES:
-        raise ValueError("Bild ist zu groß. Bitte max. 20 MB.")
+        raise ValueError("Bild ist zu groß. Maximal 20 MB erlaubt.")
 
     encoded = base64.b64encode(data).decode("utf-8")
-    return f"data:{mime_type};base64,{encoded}"
+    return f"data:image/png;base64,{encoded}"
 
 
 def describe_image(path: str | os.PathLike[str]) -> str:
@@ -61,7 +42,7 @@ def describe_image(path: str | os.PathLike[str]) -> str:
         )
 
     client = OpenAI(api_key=api_key)
-    data_url = encode_image_to_data_url(path)
+    image_url = to_png_data_url(path)
 
     prompt = """
     Du bist ein sehr genauer Bildanalysator auf Deutsch.
@@ -96,7 +77,7 @@ def describe_image(path: str | os.PathLike[str]) -> str:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": data_url}},
+                    {"type": "image_url", "image_url": {"url": image_url}},
                 ],
             }
         ],
@@ -112,11 +93,8 @@ if __name__ == "__main__":
         print("Verwendung: python image_describer.py bild.jpg")
         sys.exit(1)
 
-    image_path = sys.argv[1]
-
     try:
-        result = describe_image(image_path)
-        print(result)
-    except Exception as exc:  # pragma: no cover
+        print(describe_image(sys.argv[1]))
+    except Exception as exc:
         print(f"Fehler: {exc}", file=sys.stderr)
         sys.exit(1)
