@@ -1,28 +1,50 @@
 from __future__ import annotations
 
 import base64
+import io
 import mimetypes
 import os
 import sys
 from pathlib import Path
 
 from openai import OpenAI
+from PIL import Image, UnidentifiedImageError
 
 MAX_BYTES = 20 * 1024 * 1024
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+SUPPORTED_EXTENSIONS = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".bmp",
+    ".gif",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+}
 
 
 def encode_image_to_data_url(path: str | os.PathLike[str]) -> str:
     file_path = Path(path)
     ext = file_path.suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise ValueError(
-            "Nicht unterstütztes Bildformat. Bitte .jpg, .jpeg, .png oder .webp verwenden."
-        )
 
-    mime_type = mimetypes.guess_type(str(file_path))[0] or "image/jpeg"
+    if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+        mime_type = mimetypes.guess_type(str(file_path))[0] or "image/jpeg"
+        data = file_path.read_bytes()
+    else:
+        try:
+            with Image.open(file_path) as img:
+                img = img.convert("RGB")
+                buffer = io.BytesIO()
+                img.save(buffer, format="PNG")
+                data = buffer.getvalue()
+                mime_type = "image/png"
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise ValueError(
+                "Bild konnte nicht gelesen werden. Bitte ein gültiges Bildformat nutzen."
+            ) from exc
 
-    data = file_path.read_bytes()
     if len(data) > MAX_BYTES:
         raise ValueError("Bild ist zu groß. Bitte max. 20 MB.")
 
@@ -98,205 +120,3 @@ if __name__ == "__main__":
     except Exception as exc:  # pragma: no cover
         print(f"Fehler: {exc}", file=sys.stderr)
         sys.exit(1)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-																																																																																																																																																																																																																																																																																																																																																																																																																																																											test
